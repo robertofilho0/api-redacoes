@@ -1,21 +1,22 @@
 services:
-  api:
+  app:
     build: .
     ports:
-      - '3001:3001'
+      - '8000:8000'
     environment:
-      PORT: 3001
-      DB_DIALECT: mysql
+      APP_KEY: ${APP_KEY:?Defina APP_KEY (gere com: php artisan key:generate --show)}
+      APP_ENV: local
+      APP_DEBUG: 'true'
+      DB_CONNECTION: mysql
       DB_HOST: mysql
-      DB_USER: redacoes
+      DB_DATABASE: redacoes
+      DB_USERNAME: redacoes
       DB_PASSWORD: redacoes
-      DB_NAME: redacoes
-      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-dev-only-secret}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      SESSION_DRIVER: array
+      CACHE_STORE: file
     depends_on:
       mysql:
         condition: service_healthy
-    restart: unless-stopped
 
   mysql:
     image: mysql:8.4
@@ -24,8 +25,6 @@ services:
       MYSQL_USER: redacoes
       MYSQL_PASSWORD: redacoes
       MYSQL_ROOT_PASSWORD: root
-    ports:
-      - '3306:3306'
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
