@@ -1,31 +1,60 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const swaggerUi = require('swagger-ui-express');
+
+const env = require('./config/env');
+const openapi = require('./docs/openapi.json');
+const { sequelize } = require('./models');
+const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
+const notaRoutes = require('./routes/nota.routes');
+const notFound = require('./middlewares/notFound');
+const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
 
-// Middlewares
-app.use(cors({
-  origin: 'http://localhost:3001',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
+app.use(helmet());
+app.use(
+  cors({
+    origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(','),
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
+app.use(express.json({ limit: '100kb' }));
+if (env.NODE_ENV !== 'test') app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Rotas (caminho relativo a partir de src/app.js)
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const notaRoutes = require('./routes/notas');
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    skip: () => env.NODE_ENV === 'test',
+  }),
+);
 
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/notas', notaRoutes);
-
-// Rota raiz de teste
-app.get('/', (req, res) => {
-  res.send('API do Projeto Beth rodando!');
+app.get('/health', async (_req, res) => {
+  const database = await sequelize
+    .authenticate()
+    .then(() => 'up')
+    .catch(() => 'down');
+  res
+    .status(database === 'up' ? 200 : 503)
+    .json({ status: database === 'up' ? 'ok' : 'degraded', database });
 });
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/notas', notaRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 module.exports = app;

@@ -1,0 +1,38 @@
+services:
+  api:
+    build: .
+    ports:
+      - '3001:3001'
+    environment:
+      PORT: 3001
+      DB_DIALECT: mysql
+      DB_HOST: mysql
+      DB_USER: redacoes
+      DB_PASSWORD: redacoes
+      DB_NAME: redacoes
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-dev-only-secret}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: redacoes
+      MYSQL_USER: redacoes
+      MYSQL_PASSWORD: redacoes
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-proot']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql-data:
